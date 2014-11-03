@@ -1,8 +1,16 @@
 #!/usr/bin/env python
+import signal
 import socket
 import sys
 
+
+def shutdown(signum, frame):
+    sock.close()
+    exit(0)
+
 if __name__ == '__main__':
+    signal.signal(signal.SIGINT, shutdown)
+
     try:
         filename = sys.argv[1]
         listen_port = int(sys.argv[2])

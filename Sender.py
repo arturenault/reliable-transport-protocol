@@ -1,9 +1,16 @@
 #!/usr/bin/env python
-import io
+import signal
 import socket
 import sys
 
+
+def shutdown(signum, frame):
+    sock.close()
+    exit(0)
+
 if __name__ == '__main__':
+    signal.signal(signal.SIGINT, shutdown)
+
     try:
         filename = sys.argv[1]
         remote_ip = socket.gethostbyname(sys.argv[2])
