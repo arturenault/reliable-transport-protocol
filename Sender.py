@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import io
 import socket
 import sys
 
@@ -14,6 +15,19 @@ if __name__ == '__main__':
     except IndexError, TypeError:
         exit("usage: ./sender.py <filename> <remote_IP> <remote_port> <ack_port_num> <log_filename> <window_size>")
 
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    except socket.error:
+        exit("Error creating socket.")
+
+    fp = open(filename)
+    while True:
+        text = fp.read(1024)
+        if text == "":
+            break
+
+        sock.sendto(text, (remote_ip, remote_port))
 
 
 
