@@ -9,7 +9,7 @@ def unpack_packet(segment):
     packet_intended_port = int(header[2]) * 256 + int(header[3])
     packet_seqnum = 256 * 256 * 256 * int(header[4]) +\
                     256 * 256 * int(header[5]) +\
-                    256 *int(header[6]) +\
+                    256 * int(header[6]) +\
                     int(header[7])
     packet_acknum = 256 * 256 * 256 * int(header[8]) +\
                     256 * 256 * int(header[9]) +\
@@ -83,6 +83,10 @@ if __name__ == '__main__':
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind(("", listen_port))
+
+        ack_sock = socket.socket()
+        ack_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        ack_sock.bind(("", listen_port))
     except socket.error:
         exit("Error creating socket.")
 
@@ -90,11 +94,18 @@ if __name__ == '__main__':
     log_file = open(log_filename , 'w')
     print("Listening at " + socket.gethostbyname(socket.gethostname()) + ":" + str(listen_port))
 
+    packet, addr = sock.recvfrom(576)
+    ack_port, intended_port, seqnum, acknum,\
+        final, window_size, checksum, contents = unpack_packet(packet)
+
+    ack_sock.connect((sender_ip, sender_port))
+    ack_segment = make_ack(seqnum)
+    ack_sock.send(ack_segment)
     while True:
-        packet, addr = sock.recvfrom(576) # 576 - TCP header - IP header
+        packet, addr = sock.recvfrom(576)
         ack_port, intended_port, seqnum, acknum,\
         final, window_size, checksum, contents = unpack_packet(packet)
         ack_segment = make_ack(seqnum)
-        sock.sendto(ack_segment, (sender_ip, sender_port))
+        ack_sock.send(ack_segment)
         if final == 1:
             break

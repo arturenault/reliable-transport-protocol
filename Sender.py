@@ -71,6 +71,11 @@ if __name__ == '__main__':
         send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         send_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         send_sock.bind(("", ack_port))
+
+        ack_sock = socket.socket()
+        ack_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        ack_sock.bind(("", ack_port))
+        ack_sock.listen(1)
     except socket.error:
         exit('Error creating socket.')
 
@@ -81,22 +86,42 @@ if __name__ == '__main__':
     send_file = open(filename)
     log_file = open(log_filename, 'w')
 
+    text = send_file.read(556) # 576 - TCP header
+    checksum = 0
+    if text == "":
+        last_packet = True
+    packet = make_packet(text, last_packet)
+    send_sock.sendto(packet, (remote_ip, remote_port))
+
+    recv_sock, addr = ack_sock.accept()
+
     while True:
-        text = send_file.read(556) # 576 - TCP header
-        checksum = 0
+        ack = recv_sock.recv(20)
+        print ack
 
-        if text == "":
-            last_packet = True
+        acknum = 256 * 256 * 256 * ord(ack[8]) +\
+                    256 * 256 * ord(ack[9]) +\
+                    256 * ord(ack[10]) +\
+                    ord(ack[11])
 
-        packet = make_packet(text, last_packet)
+        if acknum == seqnum:
 
-        send_sock.sendto(packet, (remote_ip, remote_port))
-        print send_sock.recvfrom(20) # 576 - TCP header - IP header
+            text = send_file.read(556) # 576 - TCP header
+            checksum = 0
 
-        seqnum += 1
-        acknum += 1
-        if last_packet:
-            break
+            if text == "":
+                last_packet = True
+
+
+            seqnum += 1
+            acknum += 1
+
+            packet = make_packet(text, last_packet)
+
+            send_sock.sendto(packet, (remote_ip, remote_port))
+
+            if last_packet:
+                break
 
 
 
