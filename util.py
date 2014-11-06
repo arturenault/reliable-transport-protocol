@@ -1,3 +1,4 @@
+import socket
 import struct
 
 HEADER_FORMAT = "!HHIIBBHHH"
@@ -57,19 +58,22 @@ def make_packet(source_port, dest_port,
 def unpack(segment):
     header = segment[:20]
     packet_source_port, packet_dest_port, packet_seqnum, \
-        packet_acknum, packet_header_length, packet_flags, \
-        packet_window_size, packet_checksum, \
-        packet_urgent = struct.unpack(HEADER_FORMAT, header)
+    packet_acknum, packet_header_length, packet_flags, \
+    packet_window_size, packet_checksum, \
+    packet_urgent = struct.unpack(HEADER_FORMAT, header)
 
     packet_ack = (packet_flags >> 4) == 1
     packet_final = int(packet_flags % 2 == 1)
     packet_contents = segment[20:]
 
     return packet_source_port, packet_dest_port, \
-            packet_seqnum, packet_acknum, packet_header_length, \
-            packet_ack, packet_final, packet_window_size, \
-            packet_contents
+           packet_seqnum, packet_acknum, packet_header_length, \
+           packet_ack, packet_final, packet_window_size, \
+           packet_contents
 
+
+def timeout(signum, frame):
+    raise socket.timeout
 
 def shutdown(signum, frame):
     exit(0)
