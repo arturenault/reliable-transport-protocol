@@ -62,7 +62,7 @@ if __name__ == '__main__':
     ack_sock.connect((sender_ip, sender_port))
     out_port = ack_sock.getsockname()[1]
     ack_segment = util.make_packet(out_port, sender_port,
-                                   seqnum, acknum, True,
+                                   seqnum, acknum, packet_valid,
                                    False, 1, "")
     ack_sock.send(ack_segment)
 

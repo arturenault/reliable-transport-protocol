@@ -3,6 +3,7 @@ import datetime
 import signal
 import socket
 import sys
+import time
 import util
 
 WINDOW_SIZE = 1
@@ -51,22 +52,29 @@ if __name__ == '__main__':
     tcp_established = False
     text = send_file.read(556)  # 576 - TCP header
 
+    timeout_time = 1
+
     while(not tcp_established):
         try:
             packet = util.make_packet(ack_port, remote_port, seqnum, acknum, False, False, WINDOW_SIZE, text)
             send_sock.sendto(packet, (remote_ip, remote_port))
+            send_time = time.time()
 
             signal.signal(signal.SIGALRM, util.timeout)
             signal.alarm(1)
 
             recv_sock, addr = ack_sock.accept()
             tcp_established = True
-            recv_sock.settimeout(1)
+            recv_time = time.time()
+            estimated_rtt = recv_time - send_time
+            dev_rtt = 0
+            recv_sock.settimeout(timeout_time)
         except socket.timeout:
             continue
 
     while True:
         try:
+            recv_time = time.time()
             ack = recv_sock.recv(20)
             ack_source_port, ack_dest_port, ack_seqnum, ack_acknum, ack_header_length, \
                 ack_valid, ack_final, ack_window_size, ack_contents = util.unpack(ack)
@@ -75,17 +83,23 @@ if __name__ == '__main__':
                   str(ack_source_port) + " " + \
                   str(ack_dest_port) + " " + \
                   str(ack_seqnum) + " " + \
-                  str(ack_acknum)
+                  str(ack_acknum) + "\n"
+
 
             if ack_valid:
-                log = log + " ACK"
+                log = log.strip("\n") + " ACK\n"
             if ack_final:
-                log_file.write(log + " FIN\n")
-                break
-
-            log_file.write(log + "\n")
+                log = log.strip("\n") + " FIN\n"
 
             if ack_acknum == acknum and ack_valid:
+                sample_rtt = recv_time - send_time
+                estimated_rtt = estimated_rtt * 0.875 + sample_rtt * 0.125
+                log = log.strip() + " " + str(estimated_rtt) + "\n"
+                log_file.write(log)
+                if ack_final:
+                    break
+                dev_rtt = 0.75 * dev_rtt + 0.25 * abs(sample_rtt - estimated_rtt)
+                recv_sock.settimeout(estimated_rtt + 4 * dev_rtt)
 
                 text = send_file.read(556)  # 576 - TCP header
 
@@ -101,8 +115,10 @@ if __name__ == '__main__':
                                           text)
 
                 send_sock.sendto(packet, (remote_ip, remote_port))
+                send_time = time.time()
 
             else:
+                log_file.write(log)
                 raise socket.timeout
 
         except socket.timeout:
