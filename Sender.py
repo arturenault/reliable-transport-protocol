@@ -8,8 +8,26 @@ import util
 
 WINDOW_SIZE = 1
 
+def shutdown(signum, frame):
+    if log_file:
+        log_file.write("TRANSMISSION FAILED\n")
+        log_file.write("Segments sent:\t\t\t" + str(sent) + "\n")
+        log_file.write("Segments retransmitted:\t" + str(retransmitted) + "\n")
+        log_file.close()
+
+    if send_file:
+        send_file.close()
+
+    if ack_sock:
+        ack_sock.close()
+
+    if send_sock:
+        send_sock.close()
+
+    exit(1)
+
 if __name__ == '__main__':
-    signal.signal(signal.SIGINT, util.shutdown)
+    signal.signal(signal.SIGINT, shutdown)
 
     # Process command line args
     try:
@@ -41,13 +59,22 @@ if __name__ == '__main__':
     seqnum = 0
     acknum = 0
     final = False # Boolean indicating that this is the last packet
+    sent = 0
+    retransmitted = 0
 
     # Open files to reading and writing
-    send_file = open(filename)
+    try:
+        send_file = open(filename)
+    except:
+        exit("Unable to open " + filename)
+
     if log_filename == "stdout":
         log_file = sys.stdout
     else:
-        log_file = open(log_filename, 'w')
+        try:
+            log_file = open(log_filename, 'w')
+        except IOError:
+            exit("Unable to open " + log_filename)
 
     tcp_established = False
     text = send_file.read(556)  # 576 - TCP header
@@ -58,6 +85,7 @@ if __name__ == '__main__':
         try:
             packet = util.make_packet(ack_port, remote_port, seqnum, acknum, False, False, WINDOW_SIZE, text)
             send_sock.sendto(packet, (remote_ip, remote_port))
+            sent += 1
             send_time = time.time()
 
             signal.signal(signal.SIGALRM, util.timeout)
@@ -70,12 +98,13 @@ if __name__ == '__main__':
             dev_rtt = 0
             recv_sock.settimeout(timeout_time)
         except socket.timeout:
+            retransmitted += 1
             continue
 
     while True:
         try:
-            recv_time = time.time()
             ack = recv_sock.recv(20)
+            recv_time = time.time()
             ack_source_port, ack_dest_port, ack_seqnum, ack_acknum, ack_header_length, \
                 ack_valid, ack_final, ack_window_size, ack_contents = util.unpack(ack)
 
@@ -115,6 +144,7 @@ if __name__ == '__main__':
                                           text)
 
                 send_sock.sendto(packet, (remote_ip, remote_port))
+                sent += 1
                 send_time = time.time()
 
             else:
@@ -128,8 +158,12 @@ if __name__ == '__main__':
                                       text)
 
             send_sock.sendto(packet, (remote_ip, remote_port))
+            sent += 1
+            retransmitted += 1
 
-
+    print("\nTRANSMISSION SUCCESSFUL")
+    print("Segments sent:\t\t" + str(sent) )
+    print("Segments retransmitted:\t" + str(retransmitted))
 
 
 

@@ -74,6 +74,3 @@ def unpack(segment):
 
 def timeout(signum, frame):
     raise socket.timeout
-
-def shutdown(signum, frame):
-    exit(0)

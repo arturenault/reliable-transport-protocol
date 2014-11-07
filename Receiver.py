@@ -5,8 +5,24 @@ import socket
 import sys
 import util
 
+def shutdown(signum, frame):
+    if log_file:
+        log_file.write("TRANSMISSION INCOMPLETE\n")
+        log_file.close()
+
+    if recv_file:
+        recv_file.close()
+
+    if recv_sock:
+        recv_sock.close()
+
+    if ack_sock:
+        ack_sock.close()
+
+    exit(1)
+
 if __name__ == '__main__':
-    signal.signal(signal.SIGINT, util.shutdown)
+    signal.signal(signal.SIGINT, shutdown)
 
     # Set command line args
     try:
@@ -33,15 +49,20 @@ if __name__ == '__main__':
         exit("Error creating socket.")
 
     # Open files for logging and writing
-    recv_file = open(filename, 'w')
+    try:
+        recv_file = open(filename, 'w')
+    except IOError:
+        exit("Unable to open " + filename + ".")
     if log_filename == "stdout":
         log_file = sys.stdout
     else:
         log_file = open(log_filename, 'w')
+        exit("Unable to open " + log_filename + ".")
 
     next_acknum = 0
 
     # Receive first packet
+    print(socket.gethostbyname(socket.gethostname()))
     packet, addr = recv_sock.recvfrom(576)
     source_port, dest_port, seqnum, acknum, header_length, \
         ack, final, window_size, contents = util.unpack(packet)
@@ -53,7 +74,6 @@ if __name__ == '__main__':
         recv_file.write(contents)
         next_acknum += 1
 
-    recv_file.write(contents)
     log = str(datetime.datetime.now()) + " " + str(source_port) + " " + str(dest_port) + " " + str(seqnum) + " " + str(
         acknum)
     log_file.write(log + "\n")
@@ -80,9 +100,13 @@ if __name__ == '__main__':
 
         log = str(datetime.datetime.now()) + " " + str(source_port) + " " + str(dest_port) + " " + str(
             seqnum) + " " + str(acknum)
+
         if final:
             log += " FIN"
         log_file.write(log + "\n")
+
+        if checksum == 0xFFFF:
+            checksum = 0
 
         # ACK the packet if it's uncorrupted; otherwise send NAK.
         packet_valid = checksum == 0 and next_acknum == acknum
