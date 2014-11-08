@@ -1,13 +1,24 @@
 #!/usr/bin/env python
+"""
+Receiver.py
+Artur Upton Renault
+aur2103
+
+Uses a TCP-like protocol to receive files reliably over UDP.
+"""
+
+
 import datetime
 import signal
 import socket
 import sys
 import util
 
+
+# Shut down program if interrupted, closing all socks and files
 def shutdown(signum, frame):
     if log_file:
-        log_file.write("TRANSMISSION INCOMPLETE\n")
+        log_file.write("\nTRANSMISSION INCOMPLETE\n")
         log_file.close()
 
     if recv_file:
@@ -56,13 +67,14 @@ if __name__ == '__main__':
     if log_filename == "stdout":
         log_file = sys.stdout
     else:
-        log_file = open(log_filename, 'w')
-        exit("Unable to open " + log_filename + ".")
+        try:
+            log_file = open(log_filename, 'w')
+        except IOError:
+            exit("Unable to open " + log_filename + ".")
 
     next_acknum = 0
 
     # Receive first packet
-    print(socket.gethostbyname(socket.gethostname()))
     packet, addr = recv_sock.recvfrom(576)
     source_port, dest_port, seqnum, acknum, header_length, \
         ack, final, window_size, contents = util.unpack(packet)
@@ -98,15 +110,17 @@ if __name__ == '__main__':
 
         checksum = util.get_checksum(packet)
 
+        # For some reason, my checksum randomly inverts the result for a few bytes
+        # in very large files. This fixes it, the received is identical to the sent one.
+        if checksum == 0xFFFF:
+            checksum = 0
+
         log = str(datetime.datetime.now()) + " " + str(source_port) + " " + str(dest_port) + " " + str(
             seqnum) + " " + str(acknum)
 
         if final:
             log += " FIN"
         log_file.write(log + "\n")
-
-        if checksum == 0xFFFF:
-            checksum = 0
 
         # ACK the packet if it's uncorrupted; otherwise send NAK.
         packet_valid = checksum == 0 and next_acknum == acknum
@@ -121,3 +135,5 @@ if __name__ == '__main__':
         ack_sock.send(ack_segment)
         if final:
             break
+
+    print("File successfully received.")

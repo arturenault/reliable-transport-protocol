@@ -28,6 +28,7 @@ def get_checksum(data):
     return result
 
 
+# Create a packet from the necessary parameters
 def make_packet(source_port, dest_port,
                 seqnum, acknum, ack,
                 final, window_size,
@@ -55,6 +56,7 @@ def make_packet(source_port, dest_port,
     return header + contents
 
 
+# Break a packet into its component parts
 def unpack(segment):
     header = segment[:20]
     packet_source_port, packet_dest_port, packet_seqnum, \
